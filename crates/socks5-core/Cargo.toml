@@ -1,0 +1,6 @@
+[package]
+name = "socks5-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

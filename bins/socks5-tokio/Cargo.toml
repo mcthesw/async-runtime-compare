@@ -1,0 +1,10 @@
+[package]
+name = "socks5-tokio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+socks5-core.workspace = true
+
+anyhow.workspace = true
+tokio = { version = "1", features = ["full"] }
