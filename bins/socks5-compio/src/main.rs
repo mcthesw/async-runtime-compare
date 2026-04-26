@@ -1,9 +1,10 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize};
 
 use anyhow::bail;
 use compio::{
     BufResult,
     buf::{IntoInner, IoBuf},
+    dispatcher::Dispatcher,
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
@@ -17,19 +18,29 @@ const LISTEN_ADDR: &str = "127.0.0.1:10800";
 #[compio::main]
 async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(LISTEN_ADDR).await?;
-    println!("Listening on {LISTEN_ADDR}");
+    let worker_threads =
+        std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap());
+    let dispatcher = Dispatcher::builder()
+        .worker_threads(worker_threads)
+        .build()?;
+
+    println!("Listening on {LISTEN_ADDR} with {worker_threads} compio worker threads");
 
     loop {
         match listener.accept().await {
             Err(e) => println!("Error: {e:#?}"),
             Ok((stream, src)) => {
                 println!("Receive tcp stream from {src}");
-                compio::runtime::spawn(async move {
-                    if let Err(e) = handle_socks5(stream, src).await {
-                        println!("Handle {src} failed: {e:#}");
-                    }
-                })
-                .detach();
+                if dispatcher
+                    .dispatch(move || async move {
+                        if let Err(e) = handle_socks5(stream, src).await {
+                            println!("Handle {src} failed: {e:#}");
+                        }
+                    })
+                    .is_err()
+                {
+                    println!("Dispatch {src} failed");
+                }
             }
         }
     }
