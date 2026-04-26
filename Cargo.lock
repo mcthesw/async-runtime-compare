@@ -1642,6 +1642,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "socks5-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
+]
+
+[[package]]
 name = "socks5-compio"
 version = "0.1.0"
 dependencies = [
