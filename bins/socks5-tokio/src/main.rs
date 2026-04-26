@@ -10,16 +10,23 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
+const LISTEN_ADDR: &str = "127.0.0.1:10800";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:1080").await?;
+    let listener = TcpListener::bind(LISTEN_ADDR).await?;
+    println!("Listening on {LISTEN_ADDR}");
 
     loop {
         match listener.accept().await {
             Err(e) => println!("Error: {e:#?}"),
             Ok((stream, src)) => {
                 println!("Receive tcp stream from {src}");
-                tokio::spawn(handle_socks5(stream, src));
+                tokio::spawn(async move {
+                    if let Err(e) = handle_socks5(stream, src).await {
+                        println!("Handle {src} failed: {e:#}");
+                    }
+                });
             }
         }
     }

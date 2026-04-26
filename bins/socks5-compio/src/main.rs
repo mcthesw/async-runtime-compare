@@ -12,16 +12,24 @@ use socks5_core::{
     parse_connect_request, select_no_auth,
 };
 
+const LISTEN_ADDR: &str = "127.0.0.1:10800";
+
 #[compio::main]
 async fn main() -> anyhow::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:1080").await?;
+    let listener = TcpListener::bind(LISTEN_ADDR).await?;
+    println!("Listening on {LISTEN_ADDR}");
 
     loop {
         match listener.accept().await {
             Err(e) => println!("Error: {e:#?}"),
             Ok((stream, src)) => {
                 println!("Receive tcp stream from {src}");
-                let _ = compio::runtime::spawn(handle_socks5(stream, src));
+                compio::runtime::spawn(async move {
+                    if let Err(e) = handle_socks5(stream, src).await {
+                        println!("Handle {src} failed: {e:#}");
+                    }
+                })
+                .detach();
             }
         }
     }
@@ -56,6 +64,7 @@ async fn handle_socks5(mut stream: TcpStream, src: SocketAddr) -> anyhow::Result
 
 /// Read client greeting and return the full greeting bytes
 async fn read_greeting(stream: &mut TcpStream) -> anyhow::Result<Vec<u8>> {
+    // Compio owns the buffer while the operation is in flight and returns it in BufResult.
     let BufResult(res, mut greeting) = stream.read_exact(Vec::with_capacity(2)).await;
     res?;
 
@@ -97,7 +106,7 @@ async fn read_connect_request(stream: &mut TcpStream) -> anyhow::Result<Vec<u8>>
             let new_len = 4 + 1 + domain_len as usize + 2;
             req.resize(new_len, 0);
             req[4] = domain_len;
-            let BufResult(res, req) = stream.read_exact(req.slice(4..new_len)).await;
+            let BufResult(res, req) = stream.read_exact(req.slice(5..new_len)).await;
             res?;
             req.into_inner()
         }
